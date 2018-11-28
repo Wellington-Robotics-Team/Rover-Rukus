@@ -14,9 +14,9 @@ public class TeleByle extends OpMode {
     DcMotor FRM = null;
     DcMotor BLM = null;
     DcMotor BRM = null;
-
-    double power = 0.5;
-
+    DcMotor LIFT = null;
+    double power = 0.4;
+    double liftpowermodifier = 0.5;
     @Override
     public void init() {
 
@@ -24,6 +24,7 @@ public class TeleByle extends OpMode {
         FRM = hardwareMap.dcMotor.get ("FRM");
         BLM = hardwareMap.dcMotor.get ("BLM");
         BRM = hardwareMap.dcMotor.get ("BRM");
+        LIFT = hardwareMap.dcMotor.get ("LIFT");
 
         FLM.setDirection(DcMotorSimple.Direction.REVERSE);
         BLM.setDirection(DcMotorSimple.Direction.REVERSE);
@@ -46,6 +47,10 @@ public class TeleByle extends OpMode {
         powerRight = (drive - turn)*powerModifier(power); //powerRight becomes the difference of drive and turn and is multiplied by powerModifier
 
         go(powerRight,powerLeft); //go (function that sets the power for each motor) uses powerRight and powerLeft as the inputs
+
+        //if statements are controlling power for ARM
+
+        LIFT.setPower(-gamepad1.right_stick_y * 0.5);
     }
 
     public void go(double right, double left) {
@@ -70,7 +75,7 @@ public class TeleByle extends OpMode {
             return power; //returns the new value of power
         }
 
-        else{
+        else {
             return power; //returns the default value of power (0.5)
         }
     }
