@@ -1,69 +1,111 @@
 package org.firstinspires.ftc.robotcontroller.internal;
 
+//import android.media.MediaPlayer;
+
+import com.disnodeteam.dogecv.CameraViewDisplay;
+import com.disnodeteam.dogecv.DogeCV;
+import com.disnodeteam.dogecv.detectors.roverrukus.GoldAlignDetector;
+import com.disnodeteam.dogecv.detectors.roverrukus.SamplingOrderDetector;
+//import com.qualcomm.ftcrobotcontroller.R;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.TouchSensor;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 
-import org.firstinspires.ftc.robotcontroller.external.samples.BasicOpMode_Iterative;
+//import org.firstinspires.ftc.robotcore.external.navigation.Acceleration;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
+import com.qualcomm.robotcore.hardware.Servo;
 
-import com.qualcomm.hardware.modernrobotics.ModernRoboticsI2cRangeSensor;
-
-//Made by Gabo on Oct 15 2018
+//This auto was made by Gabo Gang on Oct 15 2018
 
 @Autonomous(name = "AutoGabo", group = "Auto")
 public class AutoGabo extends LinearOpMode {
-    public HardwareMap hwMap; //declare the hardware map
+    // Detector object
+    private SamplingOrderDetector orderDetector;
 
-    public DcMotor BLM; //declare motors
-    public DcMotor BRM;
-    public DcMotor FRM;
-    public DcMotor FLM;
+    private DcMotor BLM; //declare motors
+    private DcMotor BRM;
+    private DcMotor FRM;
+    private DcMotor FLM;
+    private DcMotor LIFT;
 
-    public DistanceSensor rightRangeSensor; //declares range sensors
-    public DistanceSensor leftRangeSensor;
+    private Servo GlyphServo = null;
 
-    public TouchSensor LTS; //declare touch sensors
-    public TouchSensor RTS;
+    private DistanceSensor rightRangeSensor; //declares range sensors
+    private DistanceSensor leftRangeSensor;
 
-    BNO055IMU imu; //declare imu
+    // Detector object
+    private GoldAlignDetector goldAlignDetector;
 
-    Orientation lastAngles = new Orientation(); //sets the last angle to whatever the robot last had. This is just to avoid errors
+    private BNO055IMU imu; //declare imu
 
-    double globalAngle; //the number of degrees the robot has turned
+    private Orientation lastAngles = new Orientation(); //sets the last angle to whatever the robot last had. This is just to avoid errors
 
-    double power = 0.50; //power of the robot
-    double minPower = 0.2; //least amount of power the robot can have
-    int turnDegrees = -82; //the number of degrees the robot should turn. Set to -82 to turn right 90 degrees. Latency is a pain
+//    Acceleration gravity;
 
+    private double globalAngle; //the number of degrees the robot has turned
+
+    private double power = 0.50; //power of the robot
+    private double minPower = 0.25; //least amount of power the robot can have
+    private int righturn = -81; //degrees that does an accurate 90 degree right turn
+    private int leftTurn = 81; //degrees that does an accurate 90 degree left turn
+   // private int degreeOffset = 8; //the number of degrees its usually off by when turning
+    private int distanceOffset = 8; //how many CM the robot is off by when RushingA
+    //MediaPlayer mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.undertale);
     public void runOpMode() //when you press init
     {
-        hwMap = hardwareMap; //makes the hardwaremap = to hwMap. This is for easier getting
 
-        BLM = hwMap.dcMotor.get("BLM"); //gets all the motors
+        //mediaPlayer.start();
+
+        HardwareMap hwMap = hardwareMap; //makes the hardwaremap = to hwMap. This is for easier getting
+
+        // Setup orderDetector
+        orderDetector = new SamplingOrderDetector(); // Create the orderDetector
+        orderDetector.init(hwMap.appContext, CameraViewDisplay.getInstance()); // Initialize orderDetector with app context and camera
+        orderDetector.useDefaults(); // Set orderDetector to use default settings
+        orderDetector.downscale = 0.4; // How much to downscale the input frames
+        orderDetector.areaScoringMethod = DogeCV.AreaScoringMethod.MAX_AREA; // Can also be PERFECT_AREA
+        //orderDetector.perfectAreaScorer.perfectArea = 10000; // if using PERFECT_AREA scoring
+        orderDetector.maxAreaScorer.weight = 0.001;
+        orderDetector.ratioScorer.weight = 15;
+        orderDetector.ratioScorer.perfectRatio = 1.0;
+
+        // Set up detector
+        goldAlignDetector = new GoldAlignDetector(); // Create detector
+        goldAlignDetector.init(hwMap.appContext, CameraViewDisplay.getInstance()); // Initialize it with the app context and camera
+        goldAlignDetector.useDefaults(); // Set detector to use default settings
+        goldAlignDetector.alignSize = 100; // How wide (in pixels) is the range in which the gold object will be aligned. (Represented by green bars in the preview)
+        goldAlignDetector.alignPosOffset = 0; // How far from center frame to offset this alignment zone.
+        goldAlignDetector.downscale = 0.4; // How much to downscale the input frames
+        goldAlignDetector.areaScoringMethod = DogeCV.AreaScoringMethod.MAX_AREA; // Can also be PERFECT_AREA
+        //detector.perfectAreaScorer.perfectArea = 10000; // if using PERFECT_AREA scoring
+        goldAlignDetector.maxAreaScorer.weight = 0.005; //
+        goldAlignDetector.ratioScorer.weight = 5; //
+        goldAlignDetector.ratioScorer.perfectRatio = 1.0; // Ratio adjustment
+
+        //Sets up motors
+        BLM = hwMap.dcMotor.get("BLM");
         BRM = hwMap.dcMotor.get("BRM");
         FRM = hwMap.dcMotor.get("FRM");
         FLM = hwMap.dcMotor.get("FLM");
+        LIFT = hwMap.dcMotor.get("LIFT");
 
-        //RTS = hwMap.touchSensor.get("RTS"); //gets the 2 touch sensors
-        //LTS = hwMap.touchSensor.get("LTS");
+        GlyphServo = hwMap.servo.get("Glyph");
 
-        rightRangeSensor = hardwareMap.get(DistanceSensor.class, "RRS"); //gets range sensors
-        leftRangeSensor = hardwareMap.get(DistanceSensor.class, "LRS");
+        FLM.setDirection(DcMotor.Direction.REVERSE);
+        BLM.setDirection(DcMotor.Direction.REVERSE);
+
+        rightRangeSensor = hwMap.get(DistanceSensor.class, "RRS"); //gets range sensors
+        leftRangeSensor = hwMap.get(DistanceSensor.class, "LRS");
 
         imu = hardwareMap.get(BNO055IMU.class, "imu"); //gets the imu
-
-        telemetry.addData("Working?", " ye"); //very informative telemetry
-        telemetry.update();
 
         BNO055IMU.Parameters parameters = new BNO055IMU.Parameters(); //makes parameters for imu
         parameters.mode = BNO055IMU.SensorMode.IMU;
@@ -76,9 +118,10 @@ public class AutoGabo extends LinearOpMode {
 
         imu.initialize(parameters); //initalizes the imu
 
+        telemetry.addData("Mode", " calibrating..."); //inform
+        telemetry.update();
+
         while (!isStopRequested() && !imu.isGyroCalibrated()) {
-            telemetry.addData("Mode", " calibrating..."); //inform
-            telemetry.update();
             sleep(50);
             idle();
         }
@@ -86,43 +129,313 @@ public class AutoGabo extends LinearOpMode {
         telemetry.addData("Mode", "waiting for start");
         telemetry.update();
 
-
-
-
+        GlyphServo.setDirection(Servo.Direction.REVERSE);
+        GlyphServo.setPosition(0.6);
 
         waitForStart(); //waits for the start button
 
+        winCompetition();
+    }
+
+    /**
+     * will win any competition
+     */
+    private void winCompetition()
+    {
+        telemetry.addData("Mode", "lowering...");
+        telemetry.update();
+        //mediaPlayer.stop();
+        //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.tunak);
+        //mediaPlayer.start();
+        //Lower
+        lower();
+        //mediaPlayer.stop();
+        //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.leak);
+        orderDetector.enable(); // Start orderDetector
+        telemetry.addData("Mode: ", "Unhooking");
+        telemetry.update();
+        //mediaPlayer.start();
+        unHook();
+        move(0,0);
+        telemetry.addData("Mode: ", "Searching for cube...");
+        telemetry.update();
+        //mediaPlayer.stop();
+        //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.skidaddle);
+        //mediaPlayer.start();
+        //Get cube place
+        int cubePlace = findCube();
+
+        telemetry.addData("Mode: ", "Aligning with cube");
+        telemetry.update();
+        alignWithCube();  //Aligns the robot with the cube
+        //mediaPlayer.stop();
+        //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.gas);
+        //mediaPlayer.start();
+        move(power,power);
+        sleep(1200);
+
+        telemetry.addData("Mode: ", "Rushing D");
+        telemetry.update();
+        //mediaPlayer.stop();
+        //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.deja);
+        //mediaPlayer.start();
+        RushD();
+
+        switch (cubePlace)
+        {
+            case 0: //if left
+                //mediaPlayer.stop();
+                //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.rushb);
+                //mediaPlayer.start();
+                telemetry.addData("Mode: ", "Rushing A");
+                telemetry.update();
+                RushA(40, minPower); //uses distance sensor to drive forward
+
+                telemetry.addData("Mode: ", "Aligning");
+                telemetry.update();
+                align(); //align the robot with the wall
+
+                telemetry.addData("Mode: ", "Rotating right");
+                telemetry.update();
+                rotate(righturn, power); //rotates to the right 90 degrees
+
+                //mediaPlayer.stop();
+                //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.rushf);
+                //mediaPlayer.start();
+                telemetry.addData("Mode: ", "Rushing A");
+                telemetry.update();
+                RushA(20, power); //moves to the next wall
+
+                telemetry.addData("Mode: ", "Aligning");
+                telemetry.update();
+                align();
+
+                //put down glyph
+                dropGlyph();
+
+                telemetry.addData("Mode: ", "Rotating");
+                telemetry.update();
+                rotate(righturn - 1, power); //rotates to the right 90 degrees
+
+                //mediaPlayer.stop();
+                //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.rushe);
+               // mediaPlayer.start();
+                telemetry.addData("Mode: ", "Rushing C");
+                telemetry.update();
+                RushC(true); //moves to the crater
+                break;
+            case 1: //if center
+                //mediaPlayer.stop();
+                //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.rushb);
+                //mediaPlayer.start();
+                telemetry.addData("Mode: ", "Rushing A");
+                telemetry.update();
+                RushA(80, minPower);
+
+                telemetry.addData("Mode: ", "Rotating left");
+                telemetry.update();
+                rotate(45, minPower);
+
+                telemetry.addData("Mode: ", "Aligning");
+                telemetry.update();
+                align();
+
+                telemetry.addData("Mode: ", "Rushing A");
+                telemetry.update();
+                RushA(30, minPower);
+
+                telemetry.addData("Mode: ", "Aligning");
+                telemetry.update();
+                align();
+                dropGlyph();
+                telemetry.addData("Mode: ", "Rotating right");
+                telemetry.update();
+                rotate(righturn,power);
+
+                //mediaPlayer.stop();
+                //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.rushf);
+                //mediaPlayer.start();
+                telemetry.addData("Mode: ", "Rushing A");
+                telemetry.update();
+                RushA(20, power);
 
 
+                telemetry.addData("Mode: ", "Aligning");
+                telemetry.update();
+                align();
 
+                telemetry.addData("Mode: ", "Rotating right");
+                telemetry.update();
+                rotate(righturn - 1, power);
 
-        telemetry.addData("Mode", "running");
+                //mediaPlayer.stop();
+                //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.rushe);
+                //mediaPlayer.start();
+                telemetry.addData("Mode: ", "Rushing C");
+                telemetry.update();
+                RushC(true); //moves to the crater
+                break;
+            case 2: //if right
+                //mediaPlayer.stop();
+                //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.rushb);
+                //mediaPlayer.start();
+                telemetry.addData("Mode: ", "Rushing A");
+                telemetry.update();
+                RushA(20,minPower);
+
+                align();
+                telemetry.addData("Mode: ", "Turning left");
+                telemetry.update();
+                rotate(leftTurn, minPower);
+
+                telemetry.addData("Mode: ", "Rushing A");
+                telemetry.update();
+
+                //mediaPlayer.stop();
+                //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.rushf);
+                //mediaPlayer.start();
+                RushA(20, minPower);
+
+                telemetry.addData("Mode: ", "Aligning");
+                telemetry.update();
+                align();
+
+                dropGlyph();
+                //mediaPlayer.stop();
+                //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.rushe);
+                //mediaPlayer.start();
+                telemetry.addData("Mode: ", "Rushing C");
+                telemetry.update();
+                RushC(false); //moves to the crater
+                break;
+
+        }
+        move(0, 0); //turns off
+        //mediaPlayer.stop();
+        //mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.tracer);
+        //mediaPlayer.start();
+
+        telemetry.addData("Mode: ", "Stopped");
         telemetry.update();
 
-        RushA(20); //uses distance sensor to drive forward
 
-        align(); //align the robot with the wall
 
-        rotate(turnDegrees, power); //rotates to the right 90 degrees
-
-        RushA(20); //moves to the next wall
-
-        rotate(turnDegrees, power); //rotates to the right 90 degrees
-
-        RushC(); //moves to the crater
-
-        move(0, 0); //turns off
+        stop();
     }
+
+    /**
+     * rotates a servo so that it drops the glyph.
+     */
+    private void dropGlyph ()
+    {
+        GlyphServo.setPosition(0.85);
+    }
+    /**
+     * Lower the robot at the start
+     */
+    private void lower ()
+    {
+        LIFT.setPower(power);
+        sleep(900);
+        LIFT.setPower(0);
+    }
+
+    /**
+     * Will unhook the robot
+     */
+    private void unHook()
+    {
+        rotate(20, minPower);
+
+        move(minPower,minPower);
+        sleep(500);
+        move(0,0);
+        rotate(-20, minPower);
+
+        //LIFT.setPower(0);
+        move(-minPower,-minPower);
+        sleep(500);
+        move(0,0);
+    }
+    /**
+     * if x < 280 turn left
+     * if x > 280 turn right
+     */
+    private void alignWithCube ()
+    {
+        move(0,0);
+        goldAlignDetector.enable();
+        sleep(2500);
+        while (!isStopRequested() && !goldAlignDetector.getAligned())
+        {
+            double xPos = goldAlignDetector.getXPosition();
+            telemetry.addData("IsAligned" , goldAlignDetector.getAligned()); // Is the bot aligned with the gold mineral?
+            telemetry.addData("X Pos" , xPos); // Gold X position.
+            telemetry.update();
+
+            if (xPos < 300) move(-minPower, minPower);
+            else move(minPower, -minPower);
+        }
+        move(0,0);
+        goldAlignDetector.disable();
+
+    }
+
+    /**
+     * @return 0 = left, 1 = center, 2 = right
+     * Will get the position of the cube
+     */
+    private int findCube ()
+    {
+        move(0,0);
+        sleep(2500);
+        int place; //using an int to store the place instead of just using a string because ints are easier
+        while (orderDetector.getCurrentOrder().toString().equals("UNKNOWN") && !isStopRequested()) //not do anything while the order is unknown
+        {
+            move(minPower,-minPower);
+        }
+        move(0,0);
+        orderDetector.disable();
+        switch (orderDetector.getCurrentOrder().toString())
+        {
+            case "LEFT":
+                place = 0;
+                break;
+            case "CENTER":
+                place = 1;
+                break;
+            default:
+                place = 2;
+                break;
+        }
+
+        return place; //returns the place
+    }
+
+    /**
+     * Move the robot close enough to the wall so that at least one of the sensors is working
+     */
+    private void RushD() {
+        move(minPower, minPower);
+        while (leftRangeSensor.getDistance(DistanceUnit.CM) > 800 && rightRangeSensor.getDistance(DistanceUnit.CM) > 800)
+        {
+            telemetry.addData("Left distance", leftRangeSensor.getDistance(DistanceUnit.CM));
+            telemetry.addData("Right distance", rightRangeSensor.getDistance(DistanceUnit.CM));
+            telemetry.update();
+        }
+        move(0, 0); // Insert why you use 800 here...
+    }
+
 
     /**
      * Gets the 2 distances the sensors read
      * Will return them in an array where position 0 is the left distance and position 1 is the right distance
      * 0 = left
      * 1 = right
-     * @return
+     *
+     * @return an array with the distances read from both distance sensors
      */
-    public double[] getDistances ()
-    {
+    private double[] getDistances() {
         double leftDistance = leftRangeSensor.getDistance(DistanceUnit.CM); //left sensor distance
         double rightDistance = rightRangeSensor.getDistance(DistanceUnit.CM); //right sensor distance
         double[] distances = new double[2]; //makes an array
@@ -135,53 +448,50 @@ public class AutoGabo extends LinearOpMode {
      * Will return - if robot is too far right
      * will return + if robot is too far left
      * will return 0 if robot is perfect
-     * @return
+     *
+     * @return the number of degrees its turned since the last degree reset
      */
-    public double getDeltaRange ()
-    {
+    private double getDeltaRange() {
         double[] distances = getDistances(); //gets the distances
-        double deltaRange = distances[0] - distances[1]; //subtracts the 2
-        return deltaRange; //returns the number
+        return distances[0] - distances[1]; //subtracts the 2
     }
 
     /**
      * Aligns itself with the wall
-     * doesn't work yet. DUh
      */
-    public void align()
-    {
-        double accuracy = 10; //how accurate this should be to the CM
+    private void align() {
 
-        double deltaRange = getDeltaRange();// dets the change in distance between the 2 sensors
+        double accuracy = 1; //how accurate this should be to the CM
 
-        while (Math.abs(deltaRange) > accuracy) //while the delta is greater than the accuracy we want
+        double deltaRange = getDeltaRange();// gets the change in distance between the 2 sensors      +1 because inaccurate
+
+
+        while (Math.ceil(Math.abs(deltaRange)) > accuracy && !isStopRequested()) //while the delta is greater than the accuracy we want
         {
+
+            telemetry.addData("Status: ", "Aligning");
+            deltaRange = getDeltaRange();
+            telemetry.addData("Delta Range", deltaRange);
+            telemetry.update();
             if (deltaRange < 0) //if its negative
             {
-                move(minPower,minPower);//turn left
-                getDeltaRange(); //regets the delta range
+                move(-minPower, minPower);//turn left
 
-            }
-            else if (deltaRange > 0) //if the delta range is positive
+            } else if (deltaRange > 0) //if the delta range is positive
             {
-                move(-minPower, -minPower);//turn right
-                getDeltaRange(); //regets the delta range
+                move(minPower, -minPower);//turn right
             }
         }
-        move(0,0); //stops
+        move(0, 0); //stops
     }
 
     /**
      * Rush to the crater
      * Vry nice
      */
-    public void RushC()
-    {
-        telemetry.addData("Currently: ", "Rushing A");
+    private void RushC(boolean forward) {
         telemetry.addData("Status: ", "Workin");
         telemetry.update();
-
-        RushA(200); //get 200 cm from the crater
 
         telemetry.addData("Status: ", "Finished");
         telemetry.update();
@@ -190,19 +500,25 @@ public class AutoGabo extends LinearOpMode {
 
         telemetry.addData("Current Angle: ", currentAngle);
 
-        while (currentAngle < 75) //while the current roll is less than 75
+        while ((currentAngle < 4 && currentAngle > -1.5) && !isStopRequested()) //while the current roll is less than 72
         {
             currentAngle = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.XYX, AngleUnit.DEGREES).secondAngle; //regets the currentAngle
             telemetry.addData("Current Angle: ", currentAngle);
             telemetry.update();
-            move(-minPower, minPower); //continue moving
+            if (forward)
+            {
+                move(power, power); //continue moving
+            } else
+            {
+                move(-power, -power); //backwards
+            }
+
         }
 
-        move(0,0); //stop
+        move(0, 0); //stop
         telemetry.addData("Finished", true);
         telemetry.update();
     }
-
 
 
     /**
@@ -210,7 +526,8 @@ public class AutoGabo extends LinearOpMode {
      *
      * @return Angle in degrees. + = left, - = right.
      */
-    private double getAngle() {
+    private double getAngle()
+    {
         // We experimentally determined the Z axis is the axis we want to use for heading angle.
         // We have to process the angle because the imu works in euler angles so the Z axis is
         // returned as 0 to +180 or 0 to -180 rolling back to -179 or +179 when rotation passes
@@ -236,128 +553,113 @@ public class AutoGabo extends LinearOpMode {
      * Runs until it gets close to wall
      * slowly gets slower
      */
-    public void RushA(double endDistance) //moves with distance sensor. Slowly getting slower and slower
+    private void RushA(double endDistance, double maxPowerLevel) //moves with distance sensor. Slowly getting slower and slower
     {
-    double maxPowerLevel = power; //can only move a max of 0.5 power
-    double minPowerLevel = minPower; //can't go slower than 0.15 power
-    double startDistance = rightRangeSensor.getDistance(DistanceUnit.CM); //gets the distance to the wall
-    double distanceTraveled = 0; //sets the distance traveled to 0
-    double totalNeededToTravel = startDistance - endDistance; //gets the total distance the robot needs to move
-    double lastDistance = startDistance; //last distance is first distance
+        endDistance = endDistance + distanceOffset;
+        double minPowerLevel = minPower; //can't go slower than 0.15 power
+        boolean leftSensor = false;
+        DistanceSensor closerSensor;
 
-
-    while (rightRangeSensor.getDistance(DistanceUnit.CM) > endDistance && opModeIsActive()) //while op mode is running and the distance to the wall is greater than the end distance
-    {
-        double currentDistance = rightRangeSensor.getDistance(DistanceUnit.CM); //gets the current distance to the wall
-        telemetry.addData("StartDistance", startDistance);
-        telemetry.addData("Needed to travel", totalNeededToTravel);
-        telemetry.addData("Current distance to wall",currentDistance);
-
-
-        double deltaDistance = lastDistance - currentDistance; //change in distance is the last distance - currentDistance
-
-        distanceTraveled += deltaDistance; //adds the change in distance to distance traveled
-        telemetry.addData("Distance traveled", distanceTraveled);
-        lastDistance = currentDistance; //the last distance is set to the current distance
-
-        double slope = -maxPowerLevel / (Math.pow(totalNeededToTravel, 3)); //gets the slope of the graph that is needed to make y = 0 when totalNeeded to travel is x
-
-        double power = slope * Math.pow(distanceTraveled, 3) + maxPowerLevel; // the power is the x value in that position
-
-        if (power < minPowerLevel && power > 0) power = minPowerLevel; //if the power is less than the min power level just set the power to the minpower level
-        if (power == 0) power = 0; //if its 0 then set it to 0 of course
-        telemetry.addData("Power", power);
-        move(-power, power); //moves the robot forward with whatever the power is
-        telemetry.update();
-    }
-    move(0,0); //once done stop
-
-}
-public void moveFor(double leftPower, double rightPower, int time)
-{
-    move(leftPower, rightPower); //move robot
-    sleep(time); //don't do anything for set time
-    move(0,0); //stop robot
-}
-
-    /** THIS HAS NOT BEEN TESTED YET
-     *
-     */
-    public void RushB() //move to wall with touch sensors
-    {
-        while (!RTS.isPressed() || !LTS.isPressed()) //while either of the sensors are not pressed
-        {
-            double left = power; //left power is 0.5
-            double right = power; //right power is 0.5
-
-            if (RTS.isPressed()) //if right sensor is pressed
-            {
-                right = 0; //sets right to 0 to stop
-                left = -minPower; //left slows down
-                telemetry.addData("Right Button", RTS.isPressed()); //informs that its pressed
-                telemetry.update();
-            }
-            if (LTS.isPressed()) //if left sensor is pressed
-            {
-                left = 0; //left stops
-                right = -minPower; //right is stopped
-                telemetry.addData("Left Button", LTS.isPressed()); //informs that its pressed
-                telemetry.update();
-            }
-
-            move(left, right); //moves motors with right left power
-
+        double[] distances = getDistances();
+        if (distances[0] < distances[1]) {
+            closerSensor = leftRangeSensor;
+            leftSensor = true;
+        } else {
+            closerSensor = rightRangeSensor;
         }
+        telemetry.addData("Distance to right sensor: ", distances[1]);
+        telemetry.addData("Distance to left sensor: ", distances[0]);
+        telemetry.addData("Using the left sensor? ", leftSensor);
+        telemetry.update();
 
 
-        move(0,0); //once both motors are pressed it stops
+        double startDistance = closerSensor.getDistance(DistanceUnit.CM); //gets the distance to the wall
+        double distanceTraveled = 0; //sets the distance traveled to 0
+        double totalNeededToTravel = startDistance - endDistance; //gets the total distance the robot needs to move
+        double lastDistance = startDistance; //last distance is first distance
+        double thingy = totalNeededToTravel * totalNeededToTravel * totalNeededToTravel;
+        double slope = -maxPowerLevel / thingy; //gets the slope of the graph that is needed to make y = 0 when totalNeeded to travel is x
+
+        while (closerSensor.getDistance(DistanceUnit.CM) > endDistance && !isStopRequested()) //while op mode is running and the distance to the wall is greater than the end distance
+        {
+            telemetry.addData("Status: ", "Rushing A");
+            double currentDistance = closerSensor.getDistance(DistanceUnit.CM); //gets the current distance to the wall
+            telemetry.addData("Current distance to wall: ", currentDistance);
+            telemetry.addData("Using left sensor? ", leftSensor);
+
+            double deltaDistance = lastDistance - currentDistance; //change in distance is the last distance - currentDistance
+
+            distanceTraveled += deltaDistance; //adds the change in distance to distance traveled
+            lastDistance = currentDistance; //the last distance is set to the current distance
+            double distanceCubed = distanceTraveled * distanceTraveled * distanceTraveled;
+            double power = (   slope * distanceCubed) + maxPowerLevel; // the power is the x value in that position
+            if (power > maxPowerLevel) power = minPowerLevel;
+            if (power < minPowerLevel && power > 0) power = minPowerLevel; //if the power is less than the min power level just set the power to the minpower level
+            if (power == 0) power = 0; //if its 0 then set it to 0 of course
+            telemetry.addData("Power", power);
+            move(power, power); //moves the robot forward with whatever the power is
+            telemetry.update();
+        }
+        move(0, 0); //once done stop
+
     }
 
     /**
      * Rotate left or right the number of degrees. Does not support turning more than 180 degrees.
+     *
      * @param degrees Degrees to turn, + is left - is right
      */
-    private void rotate(int degrees, double power)
-    {
+    private void rotate(int degrees, double power) {
         telemetry.addData("Rotating", true); //informs
         telemetry.update();
-        double  leftPower, rightPower; //declares the powers
 
         resetAngle(); //sets starting angle and resets the amount turned to 0
 
         // getAngle() returns + when rotating counter clockwise (left) and - when rotating clockwise (right).
-
-        if (degrees < 0)// turn right.
-        {
-            leftPower = -power; //both negative
-            rightPower = -power;
-        }
-        else if (degrees > 0)// turn left.
-        {
-            leftPower = power; //both positive
-            rightPower = power;
-        }
-        else return; //do nothing
+        double thingy = degrees * degrees * degrees;
+        double slope = -power / thingy; //gets the slope of the graph that is needed to make y = 0 when totalNeeded to travel is x
 
         // rotate until turn is completed.
-        if (degrees < 0)
-        {
+        if (degrees < 0) {
             // On right turn we have to get off zero first.
-            while (opModeIsActive() && getAngle() == 0) {
-                move(leftPower, rightPower);
+            while (!isStopRequested() && getAngle() == 0) {
+                double currentAngle = getAngle();
+                double thingy1 = currentAngle * currentAngle * currentAngle;
+                double newPower = slope * thingy1 + power; // the power is the x value in that position
+                if (newPower < minPower) newPower = minPower;
+                if (newPower <= 0) newPower = 0;
+                telemetry.addData("Power: ", -newPower);
+                telemetry.update();
+                move(newPower, -newPower);
             }
 
-            while (opModeIsActive() && getAngle() > degrees) {
-                move(leftPower, rightPower);
+            while (!isStopRequested() && getAngle() > degrees) {
+                double currentAngle = getAngle();
+                double thingy3 = currentAngle * currentAngle * currentAngle;
+                double newPower = slope * thingy3 + power; // the power is the x value in that position
+                if (newPower < minPower) newPower = minPower;
+                if (newPower <= 0) newPower = 0;
+                telemetry.addData("Power: ", -newPower);
+                telemetry.update();
+                move(newPower, -newPower);
             } //once it starts turning slightly more than it should.
-        }
-        else    // left turn.
-            while (opModeIsActive() && getAngle() < degrees) {
-                move(leftPower, rightPower);
+        } else {
+            // left turn.
+            while (!isStopRequested() && getAngle() < degrees) {
+                double currentAngle = getAngle();
+                double thingy2 = currentAngle * currentAngle * currentAngle;
+                double newPower = slope * thingy2 + power; // the power is the x value in that position
+                if (newPower < minPower) newPower = minPower;
+                if (newPower <= 0) newPower = 0;
+                telemetry.addData("Power: ", newPower);
+                telemetry.update();
+                move(-newPower, newPower);
             }
+        }
+
 
         // turn the motors off.
-        move(0,0);
+        move(0, 0);
 
         // wait for rotation to stop.
         //sleep(1000);
@@ -369,18 +671,12 @@ public void moveFor(double leftPower, double rightPower, int time)
     /**
      * Resets the cumulative angle tracking to zero.
      */
-    private void resetAngle()
-    {
+    private void resetAngle() {
         lastAngles = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES); //sets lastAngles to current angles
 
         globalAngle = 0; //global angle is set to 0
     }
 
-    /**
-     * move the robot
-     * @param leftPower right motor power
-     * @param rightPower left motor power
-     */
     public void move(double leftPower, double rightPower) //move the robot
     {
         BLM.setPower(leftPower); //sets left motors to left power
@@ -388,104 +684,4 @@ public void moveFor(double leftPower, double rightPower, int time)
         FRM.setPower(rightPower); //sets right motors to right power
         BRM.setPower(rightPower);
     }
-/** warning
- * GRAVEYARD
- */
-
-//    void composeTelemetry() {
-//
-//        // At the beginning of each telemetry update, grab a bunch of data
-//        // from the IMU that we will then display in separate lines.
-//        telemetry.addAction(new Runnable() { @Override public void run()
-//        {
-//            // Acquiring the angles is relatively expensive; we don't want
-//            // to do that in each of the three items that need that info, as that's
-//            // three times the necessary expense.
-//            angles   = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES);
-//            gravity  = imu.getGravity();
-//        }
-//        });
-//
-//        telemetry.addLine()
-//                .addData("status", new Func<String>() {
-//                    @Override public String value() {
-//                        return imu.getSystemStatus().toShortString();
-//                    }
-//                })
-//                .addData("calib", new Func<String>() {
-//                    @Override public String value() {
-//                        return imu.getCalibrationStatus().toString();
-//                    }
-//                });
-//
-//        telemetry.addLine()
-//                .addData("heading", new Func<String>() {
-//                    @Override public String value() {
-//                        return formatAngle(angles.angleUnit, angles.firstAngle);
-//                    }
-//                })
-//                .addData("roll", new Func<String>() {
-//                    @Override public String value() {
-//                        return formatAngle(angles.angleUnit, angles.secondAngle);
-//                    }
-//                })
-//                .addData("pitch", new Func<String>() {
-//                    @Override public String value() {
-//                        return formatAngle(angles.angleUnit, angles.thirdAngle);
-//                    }
-//                });
-//
-//        telemetry.addLine()
-//                .addData("grvty", new Func<String>() {
-//                    @Override public String value() {
-//                        return gravity.toString();
-//                    }
-//                })
-//                .addData("mag", new Func<String>() {
-//                    @Override public String value() {
-//                        return String.format(Locale.getDefault(), "%.3f",
-//                                Math.sqrt(gravity.xAccel*gravity.xAccel
-//                                        + gravity.yAccel*gravity.yAccel
-//                                        + gravity.zAccel*gravity.zAccel));
-//                    }
-//                });
-//    }
-//
-//    String formatAngle(AngleUnit angleUnit, double angle) {
-//        return formatDegrees(AngleUnit.DEGREES.fromUnit(angleUnit, angle));
-//    }
-//
-//    String formatDegrees(double degrees){
-//        return String.format(Locale.getDefault(), "%.1f", AngleUnit.DEGREES.normalize(degrees));
-//    }
-//        imu.startAccelerationIntegration(new Position(), new Velocity(), 1000);
-//
-//        double beginningAngle = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
-//        telemetry.addData("Beginning Angle", beginningAngle);
-//        telemetry.update();
-//        double endAngle = 90;
-//        double maxPower = 0.3;
-//
-//        double slope = -maxPower / (Math.pow(endAngle, 3));
-//        telemetry.addData("Slope", slope);
-//        telemetry.update();
-//        boolean finished = false;
-//        move(-0.3, -0.3);
-//
-//        while (!finished && opModeIsActive())
-//        {
-//            double currentAngle = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle - beginningAngle;
-//            telemetry.addData("Current Angle", currentAngle);
-//            telemetry.update();
-//            if (currentAngle == endAngle) finished = true;
-//            else
-//            {
-//                double power = slope * Math.pow(currentAngle, 3) + maxPower;
-//                telemetry.addData("Power", power);
-//                telemetry.update();
-//                move(-power, -power);
-//            }
-//        }
-//        move(0,0);
-
 }
