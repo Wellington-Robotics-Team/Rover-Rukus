@@ -103,9 +103,10 @@ public class GoldAlignDetector extends DogeCVDetector {
 
         // Vars to calculate the alignment logic.
         double alignX    = (getAdjustedSize().width / 2) + alignPosOffset; // Center point in X Pixels
-        //SEAN WILL EDIT THIS!!!!!
-        double alignXMin = alignX - (alignSize / 2); // Min X Pos in pixels
-        double alignXMax = alignX +(alignSize / 2); // Max X pos in pixels
+        //SEAN HAS EDITED THIS!!!!!
+        double alignScalar = 2.5;//This was originally 2.
+        double alignXMin = alignX - (alignSize / alignScalar); // Min X Pos in pixels
+        double alignXMax = alignX +(alignSize / alignScalar); // Max X pos in pixels
         double xPos; // Current Gold X Pos
 
         if(bestRect != null){
