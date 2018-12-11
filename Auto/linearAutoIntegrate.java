@@ -77,17 +77,27 @@ public class linearAutoIntegrate extends LinearOpMode {
 
         //Init robot
         testbot = new Robot(hardwareMap);
+        telemetry.addData("Robot Online");
+        telemetry.update();
         //Init wheels
         testbot.InitializeMotors();
+        telemetry.addData("Motors Online");
+        telemetry.update();
         //braking,
         testbot.enableBraking();
+        telemetry.addData("Braking Enabled");
+        telemetry.update();
 
         //Init Lift
         liftMotor = hardwareMap.dcMotor.get("LIFT");
         liftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         liftMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        telemetry.addData("Lift Initialized");
+        telemetry.update();
         //Set lift:
         liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        telemetry.addData("Lift Set");
+        telemetry.update();
 
         //Init DogeCV
         goldAlignDetector = new GoldAlignDetector(); // Create detector
@@ -101,6 +111,8 @@ public class linearAutoIntegrate extends LinearOpMode {
         goldAlignDetector.maxAreaScorer.weight = 0.005; //
         goldAlignDetector.ratioScorer.weight = 5; //
         goldAlignDetector.ratioScorer.perfectRatio = 1.0; // Ratio adjustment
+        telemetry.addData("DogeCV Initialized");
+        telemetry.update();
 
         //Init imu
         //gets the imu
@@ -120,6 +132,8 @@ public class linearAutoIntegrate extends LinearOpMode {
             sleep(50);
             idle();
         }
+        telemetry.addData("IMU Initialized");
+        telemetry.update();
 
         //All done!
         telemetry.addData("Status", "Initialized");
