@@ -32,17 +32,18 @@ package org.firstinspires.ftc.teamcode;
 import com.disnodeteam.dogecv.CameraViewDisplay;
 import com.disnodeteam.dogecv.DogeCV;
 import com.disnodeteam.dogecv.detectors.roverrukus.GoldAlignDetector;
-import com.disnodeteam.dogecv.detectors.roverrukus.SamplingOrderDetector;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 
 
@@ -56,14 +57,70 @@ public class linearAutoIntegrate extends LinearOpMode {
     Servo markerServo;
     DcMotor liftMotor;
     BNO055IMU imu; //declare imu
+    private DistanceSensor forewardDistSensor;
+    //DogeCV
     private GoldAlignDetector goldAlignDetector;
+    //Enum with positions for the gold mineral
+    enum GoldPosition{
+        RIGHT,
+        LEFT,
+        CENTER
+    }
+    //Variables used to do encoder driving
+    double radius = 3;//inches
+    //convert inches to ticks
+    public final double inchesToTicks = (560/(2*3.14159*radius));//560 ticks per rev for neverest 20s
 
-    //non infrastructure vars
+
+
+    //non infrastructure vars (easily editable, will be edited)
+    GoldPosition goldLoc = GoldPosition.CENTER;
+
     //position at which the servo holds the idol/marker
-    double servoHoldpos;//unknown now
+    double servoHoldPos;//unknown now
+
+    //position at which the servo drops the idol/marker
+    double servoDropPos;//unknown now
+
+    //distance in from the center of robot
+    final double forwardOffset = 2;//measure on bot
+
+    //distance from front of bot to wall
+    double wallDist;
+
+    //distance to leave in order to turn and not catch on wall
+    double turnDist;
+
     //ticks to lower the robot.
     int liftTicksLower = -13532;//what it was on jankbot
 
+    //inches to drive forward initially just to get away from the lander
+    double driveOffLift = 6;
+
+    //degree position before the align with the cube
+    double rotBeforeAlign = 0;
+    //degree position after the align with the cube
+    double rotAfterAlign;
+    //theta for sample field -- this is used in our path
+    double thetaToSample;
+
+    //use pythag and such to find length of path to the left and right minerals.
+    //finding a and b in right tri
+    double inchesToCenterMineral = 35;
+    double inchesBetweenMinerals = 14.5;
+    //finding C in right tri
+    double wiggleRoom = 0;
+    double inchesToSideMinerals = Math.sqrt(inchesToCenterMineral*inchesToCenterMineral+inchesBetweenMinerals*inchesBetweenMinerals)+wiggleRoom;
+
+    //we want to drive a little more than we really need for the minerals.
+    //in inches
+    double overshootSides = 2;
+    double overshootCenter;//this is unknown as of now because you need theta
+
+    //drive after hitting the center mineral
+    double afterCenter = 10;
+    double afterSideMineralDist;
+    double afterMineralTurn;
 
     @Override
     public void runOpMode() {
@@ -73,31 +130,24 @@ public class linearAutoIntegrate extends LinearOpMode {
         telemetry.update();
         //Init Servo
         markerServo = hardwareMap.get(Servo.class, "idol");
-        markerServo.setPosition(servoHoldpos);//set to straight up.
+        markerServo.setPosition(servoHoldPos);//set to straight up.
 
         //Init robot
         testbot = new Robot(hardwareMap);
-        telemetry.addData("Robot Online");
-        telemetry.update();
         //Init wheels
         testbot.InitializeMotors();
-        telemetry.addData("Motors Online");
-        telemetry.update();
         //braking,
         testbot.enableBraking();
-        telemetry.addData("Braking Enabled");
-        telemetry.update();
 
         //Init Lift
         liftMotor = hardwareMap.dcMotor.get("LIFT");
         liftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         liftMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        telemetry.addData("Lift Initialized");
-        telemetry.update();
         //Set lift:
         liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        telemetry.addData("Lift Set");
-        telemetry.update();
+
+        //Init distance
+        forewardDistSensor = hardwareMap.get(DistanceSensor.class, "forewardDistSensor");
 
         //Init DogeCV
         goldAlignDetector = new GoldAlignDetector(); // Create detector
@@ -111,8 +161,6 @@ public class linearAutoIntegrate extends LinearOpMode {
         goldAlignDetector.maxAreaScorer.weight = 0.005; //
         goldAlignDetector.ratioScorer.weight = 5; //
         goldAlignDetector.ratioScorer.perfectRatio = 1.0; // Ratio adjustment
-        telemetry.addData("DogeCV Initialized");
-        telemetry.update();
 
         //Init imu
         //gets the imu
@@ -132,8 +180,6 @@ public class linearAutoIntegrate extends LinearOpMode {
             sleep(50);
             idle();
         }
-        telemetry.addData("IMU Initialized");
-        telemetry.update();
 
         //All done!
         telemetry.addData("Status", "Initialized");
@@ -145,11 +191,89 @@ public class linearAutoIntegrate extends LinearOpMode {
 
         //Lower the robot/unhook
         liftMotor.setTargetPosition(liftTicksLower);
-        liftMotor.setPower(1);
+        while(liftMotor.isBusy()) {
+            liftMotor.setPower(1);
+        }
+        liftMotor.setPower(0);
 
         //Rotate back to roughly 45 deg - how it was hanging
         rotateBackToHanging();
+
+        //drive forward so that the lift doesn't hit the lander.
+        testbot.TargetDist(Robot.RIGHTMOTORS, ticksint(inchesToTicks*driveOffLift));
+        testbot.TargetDist(Robot.LEFTMOTORS, ticksint(inchesToTicks*driveOffLift));
+        encoderDrive();
+
+        //lower lift
+        liftMotor.setTargetPosition(-liftTicksLower);
+        while(liftMotor.isBusy()) {
+            liftMotor.setPower(1);
+        }
+        liftMotor.setPower(0);
+
         //Align
+        rotBeforeAlign = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
+        alignWithCube();
+        rotAfterAlign = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
+
+        //find the degree turned to find the gold mineral (will be negative if its on right)
+        thetaToSample = rotAfterAlign-rotBeforeAlign;
+        //yes, I know this takes more time than doing it myself. It's more readable, and
+        //the robot isn't moving right now so it won't throw the path off.
+
+        //decide which side gold is on
+        if (thetaToSample >10){
+            goldLoc = GoldPosition.LEFT;
+        }
+        if (thetaToSample <-10){
+            goldLoc = GoldPosition.RIGHT;
+        }
+        //default is center
+
+        //set the overshoot for the center
+        overshootCenter = overshootSides*Math.cos(degToRad(Math.abs(thetaToSample)));
+        //again, using Math. but it isn't in motion
+        //set afterSide, using trig
+        afterSideMineralDist = Math.hypot(inchesBetweenMinerals+overshootSides*Math.sin(degToRad(Math.abs(thetaToSample))),afterCenter);
+        afterMineralTurn = 90-Math.atan(Math.abs(afterCenter/inchesBetweenMinerals+overshootSides*Math.sin(degToRad(Math.abs(thetaToSample)))));
+
+        //drive up to the mineral, distance varies depending on position
+        switch (goldLoc){
+            case CENTER:
+                testbot.TargetDist(Robot.RIGHTMOTORS,ticksint(inchesToTicks*(inchesToCenterMineral+overshootCenter+afterCenter)));
+                testbot.TargetDist(Robot.LEFTMOTORS,ticksint(inchesToTicks*(inchesToCenterMineral+overshootCenter+afterCenter)));
+                encoderDrive();
+                //the middle of the path
+
+
+                break;
+            case RIGHT:
+            case LEFT:
+                //should drive far enough that the center of the bot is on the dot, then drive a bit farther.
+                testbot.TargetDist(Robot.RIGHTMOTORS,ticksint(inchesToTicks*(inchesToSideMinerals+overshootSides)));
+                testbot.TargetDist(Robot.LEFTMOTORS,ticksint(inchesToTicks*(inchesToSideMinerals+overshootSides)));
+                encoderDrive();
+                rotate(thetaToSample,maxPower);
+                rotate(afterMineralTurn*thetaToSample/Math.abs(thetaToSample),maxPower);
+                testbot.TargetDist(Robot.RIGHTMOTORS,ticksint(inchesToTicks*afterSideMineralDist));
+                testbot.TargetDist(Robot.LEFTMOTORS,ticksint(inchesToTicks*afterSideMineralDist));
+
+                encoderDrive();
+
+                break;
+        }
+        rotate(-afterMineralTurn*thetaToSample/Math.abs(thetaToSample),maxPower);
+        rotate(-45,maxPower);
+
+        wallDist = forewardDistSensor.getDistance(DistanceUnit.INCH)-forwardOffset-turnDist;
+        testbot.TargetDist(Robot.RIGHTMOTORS, (int)Math.round(inchesToTicks*wallDist));
+        testbot.TargetDist(Robot.LEFTMOTORS, (int)Math.round(inchesToTicks*wallDist));
+        encoderDrive();
+
+        rotate(-90,maxPower);
+        markerServo.setPosition(servoDropPos);
+        RushC(true);
+
 
         while (opModeIsActive()) {
 
@@ -157,7 +281,12 @@ public class linearAutoIntegrate extends LinearOpMode {
             telemetry.update();
         }
         //clean up
+        goldAlignDetector.disable();
+    }
 
+    private double degToRad(double Degrees){
+        //quick little meth
+        return Degrees*180/3.14159;
     }
 
     //initial rotation, from hanging to sitting on the field.
@@ -189,16 +318,69 @@ public class linearAutoIntegrate extends LinearOpMode {
         goldAlignDetector.disable();
 
     }
+    private int ticksint(double ticks){
+        return (int)Math.round(ticks);
+    }
+    double encSpeed = 0;
+    private void encoderDrive(){
+        int targetTicks = testbot.BRM.getTargetPosition();
+        while(opModeIsActive()&&
+                testbot.BRM.isBusy()&&
+                testbot.BLM.isBusy()){
+            encSpeed = (maxPower-minPower)/targetTicks*
+                    //take the absolute value of the average ticks between back motors minus the target divided by two.
+                    Math.abs((testbot.BRM.getCurrentPosition()+testbot.BLM.getCurrentPosition())/2-(targetTicks/2))
+                    +maxPower;
+            testbot.TankDrive(encSpeed,encSpeed);
+        }
+        testbot.TankDrive(0,0);
+        testbot.disableEncoders();
+
+    }
 
     //Methods from AutoGabo
+    private void RushC(boolean forward) {
+        telemetry.addData("Status: ", "Workin");
+        telemetry.update();
+
+        telemetry.addData("Status: ", "Finished");
+        telemetry.update();
+
+        double currentAngle = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.XYX, AngleUnit.DEGREES).secondAngle; //gets the roll of the robot
+
+        telemetry.addData("Current Angle: ", currentAngle);
+
+        while ((currentAngle < 4 && currentAngle > -1.5) && !isStopRequested()) //while the current roll is less than 72
+        {
+            currentAngle = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.XYX, AngleUnit.DEGREES).secondAngle; //regets the currentAngle
+            telemetry.addData("Current Angle: ", currentAngle);
+            telemetry.update();
+            if (forward)
+            {
+                testbot.TankDrive(minPower, minPower); //continue moving
+            } else
+            {
+                testbot.TankDrive(-minPower, -minPower); //backwards
+            }
+
+        }
+
+        testbot.TankDrive(0, 0); //stop
+        telemetry.addData("Finished", true);
+        telemetry.update();
+    }
     //Variables from AutoGabo
     private double globalAngle; //the number of degrees the robot has turned
     Orientation lastAngles = new Orientation(); //sets the last angle to whatever the robot last had. This is just to avoid errors
-    private double maxPower = 0.50; //power of the robot
-    private double minPower = 0.25; //least amount of power the robot can have
+    private double maxPower = 0.30; //power of the robot
+    private double minPower = 0.2; //least amount of power the robot can have
     //MediaPlayer mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.undertale);
 
-    private void rotate(int degrees, double maxPower) {
+    private void rotate(double degrees, double maxPower) {
+        //I changed degrees to a double because that's what the imu gives and
+        //I didn't see a reason not to.
+        // Sean 12/11/18
+
         telemetry.addData("Rotating", true); //informs
         telemetry.update();
 
