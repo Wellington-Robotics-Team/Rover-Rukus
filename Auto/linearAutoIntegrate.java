@@ -33,11 +33,10 @@ import com.disnodeteam.dogecv.CameraViewDisplay;
 import com.disnodeteam.dogecv.DogeCV;
 import com.disnodeteam.dogecv.detectors.roverrukus.GoldAlignDetector;
 import com.qualcomm.hardware.bosch.BNO055IMU;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
-import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
@@ -47,17 +46,19 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 
 
-@Disabled
+@Autonomous(name = "linearautointegrate",group = "auto")
 public class linearAutoIntegrate extends LinearOpMode {
 
     // Declare OpMode members.
     //infrastructure vars
     private ElapsedTime runtime = new ElapsedTime();
     Robot testbot;
-    Servo markerServo;
-    DcMotor liftMotor;
+    //Servo markerServo;
+    //DcMotor liftMotor;
     BNO055IMU imu; //declare imu
-    private DistanceSensor forewardDistSensor;
+    private DistanceSensor rightRangeSensor;//declare range sensor
+    private DistanceSensor leftRangeSensor;
+
     //DogeCV
     private GoldAlignDetector goldAlignDetector;
     //Enum with positions for the gold mineral
@@ -122,15 +123,20 @@ public class linearAutoIntegrate extends LinearOpMode {
     double afterSideMineralDist;
     double afterMineralTurn;
 
+    private double maxPower = 0.40; //power of the robot
+    private double minPower = 0.09; //least amount of power the robot can have
+    double turnPowerNormal = 0.3;
+    double turnPowerMin = 0.25;
+
     @Override
     public void runOpMode() {
         //Init button pressed.
 
         telemetry.addData("Status", "Started Init");
         telemetry.update();
-        //Init Servo
+        /*//Init Servo
         markerServo = hardwareMap.get(Servo.class, "idol");
-        markerServo.setPosition(servoHoldPos);//set to straight up.
+        markerServo.setPosition(servoHoldPos);//set to straight up.*/
 
         //Init robot
         testbot = new Robot(hardwareMap);
@@ -139,15 +145,16 @@ public class linearAutoIntegrate extends LinearOpMode {
         //braking,
         testbot.enableBraking();
 
-        //Init Lift
+        /*//Init Lift
         liftMotor = hardwareMap.dcMotor.get("LIFT");
         liftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         liftMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         //Set lift:
-        liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);*/
 
         //Init distance
-        forewardDistSensor = hardwareMap.get(DistanceSensor.class, "forewardDistSensor");
+        rightRangeSensor = hardwareMap.get(DistanceSensor.class, "rightRangeSensor");
+        leftRangeSensor = hardwareMap.get(DistanceSensor.class,"leftRangeSensor");
 
         //Init DogeCV
         goldAlignDetector = new GoldAlignDetector(); // Create detector
@@ -189,12 +196,12 @@ public class linearAutoIntegrate extends LinearOpMode {
         waitForStart();
         runtime.reset();
 
-        //Lower the robot/unhook
+        /*//Lower the robot/unhook
         liftMotor.setTargetPosition(liftTicksLower);
         while(liftMotor.isBusy()) {
             liftMotor.setPower(1);
         }
-        liftMotor.setPower(0);
+        liftMotor.setPower(0);*/
 
         //Rotate back to roughly 45 deg - how it was hanging
         rotateBackToHanging();
@@ -204,12 +211,12 @@ public class linearAutoIntegrate extends LinearOpMode {
         testbot.TargetDist(Robot.LEFTMOTORS, ticksint(inchesToTicks*driveOffLift));
         encoderDrive();
 
-        //lower lift
+        /*//lower lift
         liftMotor.setTargetPosition(-liftTicksLower);
         while(liftMotor.isBusy()) {
             liftMotor.setPower(1);
         }
-        liftMotor.setPower(0);
+        liftMotor.setPower(0);*/
 
         //Align
         rotBeforeAlign = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
@@ -237,6 +244,9 @@ public class linearAutoIntegrate extends LinearOpMode {
         afterSideMineralDist = Math.hypot(inchesBetweenMinerals+overshootSides*Math.sin(degToRad(Math.abs(thetaToSample))),afterCenter);
         afterMineralTurn = 90-Math.atan(Math.abs(afterCenter/inchesBetweenMinerals+overshootSides*Math.sin(degToRad(Math.abs(thetaToSample)))));
 
+        //kill the detector, clean up
+        goldAlignDetector.disable();
+
         //drive up to the mineral, distance varies depending on position
         switch (goldLoc){
             case CENTER:
@@ -253,7 +263,7 @@ public class linearAutoIntegrate extends LinearOpMode {
                 testbot.TargetDist(Robot.RIGHTMOTORS,ticksint(inchesToTicks*(inchesToSideMinerals+overshootSides)));
                 testbot.TargetDist(Robot.LEFTMOTORS,ticksint(inchesToTicks*(inchesToSideMinerals+overshootSides)));
                 encoderDrive();
-                rotate(thetaToSample,maxPower);
+                rotate(thetaToSample,turnPowerNormal);
                 rotate(afterMineralTurn*thetaToSample/Math.abs(thetaToSample),maxPower);
                 testbot.TargetDist(Robot.RIGHTMOTORS,ticksint(inchesToTicks*afterSideMineralDist));
                 testbot.TargetDist(Robot.LEFTMOTORS,ticksint(inchesToTicks*afterSideMineralDist));
@@ -262,16 +272,16 @@ public class linearAutoIntegrate extends LinearOpMode {
 
                 break;
         }
-        rotate(-afterMineralTurn*thetaToSample/Math.abs(thetaToSample),maxPower);
-        rotate(-45,maxPower);
+        rotate(-afterMineralTurn*thetaToSample/Math.abs(thetaToSample),turnPowerNormal);
+        rotate(-45,turnPowerNormal);
 
-        wallDist = forewardDistSensor.getDistance(DistanceUnit.INCH)-forwardOffset-turnDist;
+        wallDist = rightRangeSensor.getDistance(DistanceUnit.INCH)-forwardOffset-turnDist;
         testbot.TargetDist(Robot.RIGHTMOTORS, (int)Math.round(inchesToTicks*wallDist));
         testbot.TargetDist(Robot.LEFTMOTORS, (int)Math.round(inchesToTicks*wallDist));
         encoderDrive();
-
-        rotate(-90,maxPower);
-        markerServo.setPosition(servoDropPos);
+        align();
+        rotate(-90,turnPowerNormal);
+        //markerServo.setPosition(servoDropPos);
         RushC(true);
 
 
@@ -280,8 +290,6 @@ public class linearAutoIntegrate extends LinearOpMode {
             telemetry.addData("Status", "Run Time: " + runtime.toString());
             telemetry.update();
         }
-        //clean up
-        goldAlignDetector.disable();
     }
 
     private double degToRad(double Degrees){
@@ -296,7 +304,7 @@ public class linearAutoIntegrate extends LinearOpMode {
         initialRotOff = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
         //rotate
         rotate(-(int) //negative so it rotates back rather than further off.
-                Math.floor(initialRotOff),maxPower); //floor rounds down. Being conservative rather than aggressive.
+                Math.floor(initialRotOff),turnPowerMin); //floor rounds down. Being conservative rather than aggressive.
 
     }
     double startAngleAlign;
@@ -304,6 +312,8 @@ public class linearAutoIntegrate extends LinearOpMode {
     double deltaAngleAlign,angleBetweensamples;
 
     private void alignWithCube(){
+        goldAlignDetector.enable();
+        sleep(1000);
         while (opModeIsActive() && !goldAlignDetector.getAligned())
         {
             double xPos = goldAlignDetector.getXPosition();
@@ -311,8 +321,8 @@ public class linearAutoIntegrate extends LinearOpMode {
             telemetry.addData("X Pos" , xPos); // Gold X position.
             telemetry.update();
 
-            if (xPos < 300) testbot.TankDrive(minPower, -minPower);
-            else testbot.TankDrive(-minPower, minPower);
+            if (xPos < 300) testbot.TankDrive(turnPowerMin, -turnPowerMin);
+            else testbot.TankDrive(-turnPowerMin, turnPowerMin);
         }
         testbot.TankDrive(0,0);
         goldAlignDetector.disable();
@@ -339,6 +349,44 @@ public class linearAutoIntegrate extends LinearOpMode {
     }
 
     //Methods from AutoGabo
+    //align
+    private void align() {
+
+        double accuracy = 1; //how accurate this should be to the CM
+
+        double deltaRange = getDeltaRange();// gets the change in distance between the 2 sensors      +1 because inaccurate
+
+
+        while (Math.ceil(Math.abs(deltaRange)) > accuracy && !isStopRequested()) //while the delta is greater than the accuracy we want
+        {
+
+            telemetry.addData("Status: ", "Aligning");
+            deltaRange = getDeltaRange();
+            telemetry.addData("Delta Range", deltaRange);
+            telemetry.update();
+            if (deltaRange < 0) //if its negative
+            {
+                testbot.TankDrive(turnPowerMin, -turnPowerMin);//turn left
+
+            } else if (deltaRange > 0) //if the delta range is positive
+            {
+                testbot.TankDrive(-turnPowerMin, turnPowerMin);//turn right
+            }
+        }
+        testbot.TankDrive(0,0); //stops
+    }
+    private double getDeltaRange() {
+        double[] distances = getDistances(); //gets the distances
+        return distances[0] - distances[1]; //subtracts the 2
+    }
+    private double[] getDistances() {
+        double leftDistance = leftRangeSensor.getDistance(DistanceUnit.CM); //left sensor distance
+        double rightDistance = rightRangeSensor.getDistance(DistanceUnit.CM); //right sensor distance
+        double[] distances = new double[2]; //makes an array
+        distances[0] = leftDistance; //sets positions to values
+        distances[1] = rightDistance;
+        return distances; //returns the array
+    }
     private void RushC(boolean forward) {
         telemetry.addData("Status: ", "Workin");
         telemetry.update();
@@ -372,9 +420,7 @@ public class linearAutoIntegrate extends LinearOpMode {
     //Variables from AutoGabo
     private double globalAngle; //the number of degrees the robot has turned
     Orientation lastAngles = new Orientation(); //sets the last angle to whatever the robot last had. This is just to avoid errors
-    private double maxPower = 0.30; //power of the robot
-    private double minPower = 0.2; //least amount of power the robot can have
-    //MediaPlayer mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.undertale);
+        //MediaPlayer mediaPlayer = MediaPlayer.create(hardwareMap.appContext, R.raw.undertale);
 
     private void rotate(double degrees, double maxPower) {
         //I changed degrees to a double because that's what the imu gives and
