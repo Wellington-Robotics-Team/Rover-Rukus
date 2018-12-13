@@ -123,10 +123,10 @@ public class linearAutoIntegrate extends LinearOpMode {
     double afterSideMineralDist;
     double afterMineralTurn;
 
-    private double maxPower = 0.40; //power of the robot
+    private double maxPower = 0.30; //power of the robot
     private double minPower = 0.09; //least amount of power the robot can have
     double turnPowerNormal = 0.3;
-    double turnPowerMin = 0.25;
+    double turnPowerMin = 0.15;
 
     @Override
     public void runOpMode() {
@@ -272,7 +272,9 @@ public class linearAutoIntegrate extends LinearOpMode {
 
                 break;
         }
-        rotate(-afterMineralTurn*thetaToSample/Math.abs(thetaToSample),turnPowerNormal);
+        telemetry.addData("Status: ", "Workin");
+        telemetry.update();
+        //rotate(-afterMineralTurn*thetaToSample/Math.abs(thetaToSample),turnPowerNormal);
         rotate(-45,turnPowerNormal);
 
         wallDist = rightRangeSensor.getDistance(DistanceUnit.INCH)-forwardOffset-turnDist;
@@ -443,7 +445,7 @@ public class linearAutoIntegrate extends LinearOpMode {
                 double currentAngle = getAngle();
                 double thingy1 = currentAngle * currentAngle * currentAngle;
                 double newPower = slope * thingy1 + maxPower; // the power is the x value in that position
-                if (newPower < minPower) newPower = minPower;
+                if (newPower < turnPowerMin) newPower = turnPowerMin;
                 if (newPower <= 0) newPower = 0;
                 telemetry.addData("Power: ", -newPower);
                 telemetry.update();
@@ -454,7 +456,7 @@ public class linearAutoIntegrate extends LinearOpMode {
                 double currentAngle = getAngle();
                 double thingy3 = currentAngle * currentAngle * currentAngle;
                 double newPower = slope * thingy3 + maxPower; // the power is the x value in that position
-                if (newPower < minPower) newPower = minPower;
+                if (newPower < turnPowerMin) newPower = turnPowerMin;
                 if (newPower <= 0) newPower = 0;
                 telemetry.addData("Power: ", -newPower);
                 telemetry.update();
@@ -466,7 +468,7 @@ public class linearAutoIntegrate extends LinearOpMode {
                 double currentAngle = getAngle();
                 double thingy2 = currentAngle * currentAngle * currentAngle;
                 double newPower = slope * thingy2 + maxPower; // the power is the x value in that position
-                if (newPower < minPower) newPower = minPower;
+                if (newPower < turnPowerMin) newPower = turnPowerMin;
                 if (newPower <= 0) newPower = 0;
                 telemetry.addData("Power: ", newPower);
                 telemetry.update();
