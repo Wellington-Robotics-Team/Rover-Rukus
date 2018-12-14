@@ -604,9 +604,9 @@ public class AutoGabo extends LinearOpMode {
 
     }
 
-    /**
+     /**
      * Rotate left or right the number of degrees. Does not support turning more than 180 degrees.
-     *
+     * This will slowly increase speed as the robot gets closer to the specified degrees
      * @param degrees Degrees to turn, + is left - is right
      */
     private void rotate(int degrees, double power) {
@@ -616,18 +616,19 @@ public class AutoGabo extends LinearOpMode {
         resetAngle(); //sets starting angle and resets the amount turned to 0
 
         // getAngle() returns + when rotating counter clockwise (left) and - when rotating clockwise (right).
-        double thingy = degrees * degrees * degrees;
-        double slope = -power / thingy; //gets the slope of the graph that is needed to make y = 0 when totalNeeded to travel is x
+        double rotateCubed = degrees * degrees * degrees; //a new variable to make things easier for me to read
+        double slope = (power - minPower) / rotateCubed;
 
         // rotate until turn is completed.
         if (degrees < 0) {
             // On right turn we have to get off zero first.
             while (!isStopRequested() && getAngle() == 0) {
                 double currentAngle = getAngle();
-                double thingy1 = currentAngle * currentAngle * currentAngle;
-                double newPower = slope * thingy1 + power; // the power is the x value in that position
+                double CurrentAngleCubed = currentAngle * currentAngle * currentAngle;
+                double newPower = slope * CurrentAngleCubed + minPower;
                 if (newPower < minPower) newPower = minPower;
-                if (newPower <= 0) newPower = 0;
+                else if (newPower > power) newPower = power;
+                if (newPower < 0) newPower = 0;
                 telemetry.addData("Power: ", -newPower);
                 telemetry.update();
                 move(newPower, -newPower);
@@ -635,10 +636,11 @@ public class AutoGabo extends LinearOpMode {
 
             while (!isStopRequested() && getAngle() > degrees) {
                 double currentAngle = getAngle();
-                double thingy3 = currentAngle * currentAngle * currentAngle;
-                double newPower = slope * thingy3 + power; // the power is the x value in that position
+                double CurrentAngleCubed = currentAngle * currentAngle * currentAngle;
+                double newPower = slope * CurrentAngleCubed + minPower;
                 if (newPower < minPower) newPower = minPower;
-                if (newPower <= 0) newPower = 0;
+                else if (newPower > power) newPower = power;
+                if (newPower < 0) newPower = 0;
                 telemetry.addData("Power: ", -newPower);
                 telemetry.update();
                 move(newPower, -newPower);
@@ -647,10 +649,11 @@ public class AutoGabo extends LinearOpMode {
             // left turn.
             while (!isStopRequested() && getAngle() < degrees) {
                 double currentAngle = getAngle();
-                double thingy2 = currentAngle * currentAngle * currentAngle;
-                double newPower = slope * thingy2 + power; // the power is the x value in that position
+                double CurrentAngleCubed = currentAngle * currentAngle * currentAngle;
+                double newPower = slope * CurrentAngleCubed + minPower;
                 if (newPower < minPower) newPower = minPower;
-                if (newPower <= 0) newPower = 0;
+                else if (newPower > power) newPower = power;
+                if (newPower < 0) newPower = 0;
                 telemetry.addData("Power: ", newPower);
                 telemetry.update();
                 move(-newPower, newPower);
