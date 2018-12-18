@@ -126,7 +126,7 @@ public class linearAutoIntegrate extends LinearOpMode {
     private double maxPower = 0.30; //power of the robot
     private double minPower = 0.09; //least amount of power the robot can have
     double turnPowerNormal = 0.3;
-    double turnPowerMin = 0.15;
+    double turnPowerMin = 0.25;
 
     @Override
     public void runOpMode() {
@@ -242,47 +242,62 @@ public class linearAutoIntegrate extends LinearOpMode {
         //again, using Math. but it isn't in motion
         //set afterSide, using trig
         afterSideMineralDist = Math.hypot(inchesBetweenMinerals+overshootSides*Math.sin(degToRad(Math.abs(thetaToSample))),afterCenter);
-        afterMineralTurn = 90-Math.atan(Math.abs(afterCenter/inchesBetweenMinerals+overshootSides*Math.sin(degToRad(Math.abs(thetaToSample)))));
+        afterMineralTurn = 90-Math.atan(Math.abs((overshootCenter+afterCenter)/(inchesBetweenMinerals+overshootSides*Math.sin(degToRad(Math.abs(thetaToSample))))));
 
         //kill the detector, clean up
         goldAlignDetector.disable();
 
         //drive up to the mineral, distance varies depending on position
         switch (goldLoc){
+
             case CENTER:
+
+                telemetry.addData("Status: ", "CENTER");
+                telemetry.update();
                 testbot.TargetDist(Robot.RIGHTMOTORS,ticksint(inchesToTicks*(inchesToCenterMineral+overshootCenter+afterCenter)));
                 testbot.TargetDist(Robot.LEFTMOTORS,ticksint(inchesToTicks*(inchesToCenterMineral+overshootCenter+afterCenter)));
                 encoderDrive();
                 //the middle of the path
 
-
                 break;
             case RIGHT:
+                telemetry.addData("Status: ", "RIGHT");
+                telemetry.addData("Theta: ", thetaToSample);
+                telemetry.update();
             case LEFT:
+                if (goldLoc == GoldPosition.LEFT){
+                    telemetry.addData("Status: ", "LEFT");
+                    telemetry.addData("Theta: ", thetaToSample);
+                    telemetry.update();
+                }
                 //should drive far enough that the center of the bot is on the dot, then drive a bit farther.
                 testbot.TargetDist(Robot.RIGHTMOTORS,ticksint(inchesToTicks*(inchesToSideMinerals+overshootSides)));
                 testbot.TargetDist(Robot.LEFTMOTORS,ticksint(inchesToTicks*(inchesToSideMinerals+overshootSides)));
                 encoderDrive();
-                rotate(thetaToSample,turnPowerNormal);
-                rotate(afterMineralTurn*thetaToSample/Math.abs(thetaToSample),maxPower);
-                testbot.TargetDist(Robot.RIGHTMOTORS,ticksint(inchesToTicks*afterSideMineralDist));
+                telemetry.addData("Status: ", "");
+                telemetry.update();
+                rotate(-thetaToSample,turnPowerNormal);
+                //rotate(-afterMineralTurn*thetaToSample/Math.abs(thetaToSample),maxPower);
+                rotate(45,turnPowerNormal);
+                /*testbot.TargetDist(Robot.RIGHTMOTORS,ticksint(inchesToTicks*afterSideMineralDist));
                 testbot.TargetDist(Robot.LEFTMOTORS,ticksint(inchesToTicks*afterSideMineralDist));
-
                 encoderDrive();
+                rotate(afterMineralTurn*thetaToSample/Math.abs(thetaToSample),turnPowerNormal);*/
+
 
                 break;
         }
-        telemetry.addData("Status: ", "Workin");
+        telemetry.addData("Status: ", "Post-Switch");
         telemetry.update();
-        //rotate(-afterMineralTurn*thetaToSample/Math.abs(thetaToSample),turnPowerNormal);
-        rotate(-45,turnPowerNormal);
+        //rotate(-45,turnPowerNormal);
 
         wallDist = rightRangeSensor.getDistance(DistanceUnit.INCH)-forwardOffset-turnDist;
         testbot.TargetDist(Robot.RIGHTMOTORS, (int)Math.round(inchesToTicks*wallDist));
         testbot.TargetDist(Robot.LEFTMOTORS, (int)Math.round(inchesToTicks*wallDist));
         encoderDrive();
+        rotate(90,turnPowerNormal);
         align();
-        rotate(-90,turnPowerNormal);
+
         //markerServo.setPosition(servoDropPos);
         RushC(true);
 
