@@ -58,6 +58,7 @@ public class linearAutoIntegrate extends LinearOpMode {
     BNO055IMU imu; //declare imu
     private DistanceSensor rightRangeSensor;//declare range sensor
     private DistanceSensor leftRangeSensor;
+    private DistanceSensor frontRangeSensor;
 
     //DogeCV
     private GoldAlignDetector goldAlignDetector;
@@ -90,7 +91,7 @@ public class linearAutoIntegrate extends LinearOpMode {
     double wallDist;
 
     //distance to leave in order to turn and not catch on wall
-    double turnDist;
+    double turnDist = 2;
 
     //ticks to lower the robot.
     int liftTicksLower = -13532;//what it was on jankbot
@@ -122,6 +123,7 @@ public class linearAutoIntegrate extends LinearOpMode {
     double afterCenter = 10;
     double afterSideMineralDist;
     double afterMineralTurn;
+    double backUpinches = -20;
 
     private double maxPower = 0.30; //power of the robot
     private double minPower = 0.09; //least amount of power the robot can have
@@ -155,6 +157,7 @@ public class linearAutoIntegrate extends LinearOpMode {
         //Init distance
         rightRangeSensor = hardwareMap.get(DistanceSensor.class, "rightRangeSensor");
         leftRangeSensor = hardwareMap.get(DistanceSensor.class,"leftRangeSensor");
+        frontRangeSensor = hardwareMap.get(DistanceSensor.class,"frontRangeSensor");
 
         //Init DogeCV
         goldAlignDetector = new GoldAlignDetector(); // Create detector
@@ -202,6 +205,7 @@ public class linearAutoIntegrate extends LinearOpMode {
             liftMotor.setPower(1);
         }
         liftMotor.setPower(0);*/
+        sleep(1000);
 
         //Rotate back to roughly 45 deg - how it was hanging
         rotateBackToHanging();
@@ -291,12 +295,17 @@ public class linearAutoIntegrate extends LinearOpMode {
         telemetry.update();
         //rotate(-45,turnPowerNormal);
 
-        wallDist = rightRangeSensor.getDistance(DistanceUnit.INCH)-forwardOffset-turnDist;
+        wallDist = frontRangeSensor.getDistance(DistanceUnit.INCH)-forwardOffset-turnDist;
         testbot.TargetDist(Robot.RIGHTMOTORS, (int)Math.round(inchesToTicks*wallDist));
         testbot.TargetDist(Robot.LEFTMOTORS, (int)Math.round(inchesToTicks*wallDist));
         encoderDrive();
         rotate(90,turnPowerNormal);
         align();
+        if(goldLoc == GoldPosition.LEFT){
+            testbot.TargetDist(Robot.RIGHTMOTORS, (int)Math.round(inchesToTicks*backUpinches));
+            testbot.TargetDist(Robot.LEFTMOTORS, (int)Math.round(inchesToTicks*backUpinches));
+            encoderDrive();
+        }
 
         //markerServo.setPosition(servoDropPos);
         RushC(true);
@@ -369,10 +378,10 @@ public class linearAutoIntegrate extends LinearOpMode {
     //align
     private void align() {
 
-        double accuracy = 1; //how accurate this should be to the CM
+        double accuracy = 0.75
+                ; //how accurate this should be to the CM
 
         double deltaRange = getDeltaRange();// gets the change in distance between the 2 sensors      +1 because inaccurate
-
 
         while (Math.ceil(Math.abs(deltaRange)) > accuracy && !isStopRequested()) //while the delta is greater than the accuracy we want
         {
@@ -414,18 +423,19 @@ public class linearAutoIntegrate extends LinearOpMode {
         double currentAngle = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.XYX, AngleUnit.DEGREES).secondAngle; //gets the roll of the robot
 
         telemetry.addData("Current Angle: ", currentAngle);
-
-        while ((currentAngle < 4 && currentAngle > -1.5) && !isStopRequested()) //while the current roll is less than 72
+        telemetry.update();
+        sleep(3000);
+        while ((currentAngle < -87 && currentAngle > -92) && !isStopRequested()) //while the current roll is less than 72
         {
             currentAngle = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.XYX, AngleUnit.DEGREES).secondAngle; //regets the currentAngle
             telemetry.addData("Current Angle: ", currentAngle);
             telemetry.update();
             if (forward)
             {
-                testbot.TankDrive(minPower, minPower); //continue moving
+                testbot.TankDrive(minPower+0.1, minPower+0.1); //continue moving
             } else
             {
-                testbot.TankDrive(-minPower, -minPower); //backwards
+                testbot.TankDrive(-minPower-0.1, -minPower-0.1); //backwards
             }
 
         }
