@@ -34,7 +34,6 @@ import com.disnodeteam.dogecv.DogeCV;
 import com.disnodeteam.dogecv.detectors.roverrukus.GoldAlignDetector;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -45,9 +44,11 @@ import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 
+import java.util.concurrent.TimeUnit;
 
-@Autonomous(name = "linearautointegrate",group = "auto")
-public class linearAutoIntegrate extends LinearOpMode {
+
+@Autonomous(name = "linearautointegratePID",group = "auto")
+public class linearAutoIntegratePID extends LinearOpMode {
 
     // Declare OpMode members.
     //infrastructure vars
@@ -116,7 +117,7 @@ public class linearAutoIntegrate extends LinearOpMode {
 
     //we want to drive a little more than we really need for the minerals.
     //in inches
-    double overshootSides = 2;
+    double overshootSides = 0.5;
     double overshootCenter;//this is unknown as of now because you need theta
 
     //drive after hitting the center mineral
@@ -129,6 +130,19 @@ public class linearAutoIntegrate extends LinearOpMode {
     private double minPower = 0.09; //least amount of power the robot can have
     double turnPowerNormal = 0.3;
     double turnPowerMin = 0.25;
+
+    //important vars for pid align
+    double timePrev = 0;
+    double timeCurr = 0;
+    double timeDelta = 0;
+    double error;
+    double pControl;
+    double pGain = -0.068;//should be tuned
+
+    double iControl;
+    double iGain = -0.0005;//should be tuned
+
+    double controllerOut;
 
     @Override
     public void runOpMode() {
@@ -224,14 +238,12 @@ public class linearAutoIntegrate extends LinearOpMode {
 
         //Align
         rotBeforeAlign = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
-        rotate(30,turnPowerNormal);
+        rotate(-30,turnPowerNormal);
         alignWithCube();
         rotAfterAlign = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
 
         //find the degree turned to find the gold mineral (will be negative if its on right)
         thetaToSample = rotAfterAlign-rotBeforeAlign;
-        //yes, I know this takes more time than doing it myself. It's more readable, and
-        //the robot isn't moving right now so it won't throw the path off.
 
         //decide which side gold is on
         if (thetaToSample >10){
@@ -301,7 +313,12 @@ public class linearAutoIntegrate extends LinearOpMode {
         testbot.TargetDist(Robot.LEFTMOTORS, (int)Math.round(inchesToTicks*wallDist));
         encoderDrive();
         rotate(90,turnPowerNormal);
-        align();
+        runtime.reset();
+        while(opModeIsActive()&&runtime.time(TimeUnit.SECONDS)<6)
+        {
+            alignPid();
+        }
+        testbot.TankDrive(0,0);
         if(goldLoc == GoldPosition.LEFT){
             testbot.TargetDist(Robot.RIGHTMOTORS, (int)Math.round(inchesToTicks*backUpinches));
             testbot.TargetDist(Robot.LEFTMOTORS, (int)Math.round(inchesToTicks*backUpinches));
@@ -317,6 +334,32 @@ public class linearAutoIntegrate extends LinearOpMode {
             telemetry.addData("Status", "Run Time: " + runtime.toString());
             telemetry.update();
         }
+    }
+    private void alignPid(){
+
+        error = getDeltaRange();
+
+        timePrev = timeCurr;
+        timeCurr = runtime.time(TimeUnit.SECONDS);
+        //this and timeprev implementation are new
+        timeDelta = timeCurr-timeDelta;
+
+        pControl = error*pGain;
+        //this is new
+        iControl = error*iGain*timeDelta + iControl;// add to integrate
+
+        controllerOut = pControl+iControl;
+        if(Math.abs(controllerOut) > maxPower)controllerOut=maxPower*getSign(controllerOut);
+        testbot.TankDrive(controllerOut,-controllerOut);
+
+        telemetry.addData("delta",error);
+        telemetry.addData("pGain", pGain);
+        telemetry.addData("iGain", iGain);
+        telemetry.addData("icontrol", iControl);
+        telemetry.addData("controllerOut", controllerOut);
+    }
+    private double getSign(double s){
+        return Math.abs(s)/s;
     }
 
     private double degToRad(double Degrees){
@@ -432,10 +475,10 @@ public class linearAutoIntegrate extends LinearOpMode {
             telemetry.update();
             if (forward)
             {
-                testbot.TankDrive(minPower+0.1, minPower+0.1); //continue moving
+                testbot.TankDrive(minPower+0.2, minPower+0.2); //continue moving
             } else
             {
-                testbot.TankDrive(-minPower-0.1, -minPower-0.1); //backwards
+                testbot.TankDrive(-minPower-0.2, -minPower-0.2); //backwards
             }
 
         }
