@@ -47,7 +47,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 import java.util.concurrent.TimeUnit;
 
 
-@Autonomous(name = "UnitAlignV3(PID)", group = "1v1 me rust")
+@Autonomous(name = "linearUnitAlignV3(PID)", group = "1v1 me rust")
 public class linearUnitAlignPID extends TunableLinearOpMode {
     // Declare OpMode members.
     //infrastructure vars
@@ -141,10 +141,10 @@ public class linearUnitAlignPID extends TunableLinearOpMode {
     double timeDelta = 0;
     double error;
     double pControl;
-    double pGain = -0.04;//should be tuned
+    double pGain = 0.068;//should be tuned
 
     double iControl;
-    double iGain = -0.0003;//should be tuned
+    double iGain = 0.0005;//should be tuned
 
     double controllerOut;
 
@@ -186,8 +186,8 @@ public class linearUnitAlignPID extends TunableLinearOpMode {
 
         runtime.reset();
         while (opModeIsActive()) {
-            pGain = getDouble("pGain");
-            iGain = getDouble("iGain");
+            //pGain = getDouble("pGain");
+            //iGain = getDouble("iGain");
             alignPid();
             telemetry.addData("Status", "Run Time: " + runtime.toString());
             telemetry.update();
@@ -212,6 +212,8 @@ public class linearUnitAlignPID extends TunableLinearOpMode {
         testbot.TankDrive(controllerOut,-controllerOut);
 
         telemetry.addData("delta",error);
+        telemetry.addData("leftsensor",leftRangeSensor.getDistance(DistanceUnit.CM));
+        telemetry.addData("rightsensor",rightRangeSensor.getDistance(DistanceUnit.CM));
         telemetry.addData("pGain", pGain);
         telemetry.addData("iGain", iGain);
         telemetry.addData("icontrol", iControl);
