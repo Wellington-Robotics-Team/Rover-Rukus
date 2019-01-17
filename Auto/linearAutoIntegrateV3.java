@@ -188,7 +188,7 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
         while (!isStopRequested() && !imu.isGyroCalibrated()) {
             telemetry.addData("Status", " calibrating..."); //inform
             telemetry.update();
-            sleep(50);
+            sleep(10);
             idle();
         }
 
@@ -208,7 +208,7 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
         liftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         liftMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         //Set lift:
-        liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        //liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
 
         //All done!
@@ -332,22 +332,27 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
         //rotate(-45,turnPowerNormal);
         telemetry.addData("Status: ", "DRIVE to wall, 90 next");
         telemetry.update();
-        sleep(500);
-
+        //sleep(500);
+        if (goldLoc ==GoldPosition.RIGHT)LoopAlignPid(1,1);
         wallDist = frontRangeSensor.getDistance(DistanceUnit.INCH)-forwardOffset-turnDist;
         telemetry.addData("Wall: ", wallDist);
         telemetry.update();
         testbot.TargetDist(Robot.RIGHTMOTORS, (int)Math.round(inchesToTicks*wallDist));
         testbot.TargetDist(Robot.LEFTMOTORS, (int)Math.round(inchesToTicks*wallDist));
         encoderDrive();
-        sleep(1000);
+        //sleep(1000);
         rotate(90,turnPowerNormal);
+        if(goldLoc==GoldPosition.RIGHT){
+            testbot.TargetDist(Robot.RIGHTMOTORS, (int)Math.round(inchesToTicks*12));
+            testbot.TargetDist(Robot.LEFTMOTORS, (int)Math.round(inchesToTicks*12));
+            encoderDrive();
+        }
         telemetry.addData("Status: ", "90, backup next" );
         telemetry.update();
         //sleep(1000);
         //align();
-        LoopAlignPid(0.4,4);//normal values are 0.4 and 4
-        sleep(1000);
+        LoopAlignPid(0.6,4);//normal values are 0.4 and 4
+        //sleep(1000);
         if(goldLoc == GoldPosition.LEFT){
             testbot.TargetDist(Robot.RIGHTMOTORS, (int)Math.round(inchesToTicks*backUpinches));
             testbot.TargetDist(Robot.LEFTMOTORS, (int)Math.round(inchesToTicks*backUpinches));
@@ -360,7 +365,7 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
 
         while (opModeIsActive()) {
 
-            telemetry.addData("Status", "Run Time: " + runtime.toString());
+            telemetry.addData("Status", "Finished. Time: " + runtime.toString());
             telemetry.update();
         }
     }
@@ -502,15 +507,15 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
     //align
     private void align() {
 
-        double accuracy = 0.75; //how accurate this should be to the CM
+        double accuracy = 1; //how accurate this should be to the CM
 
-        double deltaRange = getDeltaRange();// gets the cha  nge in distance between the 2 sensors      +1 because inaccurate
+        double deltaRange = -getDeltaRange();// gets the cha  nge in distance between the 2 sensors      +1 because inaccurate
 
         while (Math.ceil(Math.abs(deltaRange)) > accuracy && !isStopRequested()) //while the delta is greater than the accuracy we want
         {
 
             telemetry.addData("Status: ", "Aligning");
-            deltaRange = getDeltaRange();
+            deltaRange = -getDeltaRange();
             telemetry.addData("Delta Range", deltaRange);
             telemetry.update();
             if (deltaRange < 0) //if its negative
@@ -548,17 +553,17 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
         telemetry.addData("Current Angle: ", currentAngle);
         telemetry.update();
         //sleep(3000);
-        while ((currentAngle < -87 && currentAngle > -92) && !isStopRequested()) //while the current roll is less than 72
+        while ((currentAngle < -80 && currentAngle > -100) && !isStopRequested()) //while the current roll is less than 72
         {
             currentAngle = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.XYX, AngleUnit.DEGREES).secondAngle; //regets the currentAngle
             telemetry.addData("Current Angle: ", currentAngle);
             telemetry.update();
             if (forward)
             {
-                testbot.TankDrive(minPower+0.1, minPower+0.1); //continue moving
+                testbot.TankDrive(maxPower, maxPower); //continue moving
             } else
             {
-                testbot.TankDrive(-minPower-0.1, -minPower-0.1); //backwards
+                testbot.TankDrive(-maxPower, -maxPower); //backwards
             }
 
         }
