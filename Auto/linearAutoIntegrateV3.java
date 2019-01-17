@@ -56,7 +56,7 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
     private ElapsedTime runtime = new ElapsedTime();
     Robot testbot;
     //Servo markerServo;
-    //DcMotor liftMotor;
+    DcMotor liftMotor;
     BNO055IMU imu; //declare imu
     private DistanceSensor rightRangeSensor;//declare range sensor
     private DistanceSensor leftRangeSensor;
@@ -87,7 +87,7 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
     double servoDropPos;//unknown now
 
     //distance in from the center of robot
-    final double forwardOffset =0;//measure on bot
+    final double forwardOffset =0.5;//measure on bot
 
     //distance from front of bot to wall
     double wallDist;
@@ -96,7 +96,7 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
     double turnDist = 2;
 
     //ticks to lower the robot.
-    int liftTicksLower = -13532;//what it was on jankbot
+    int liftTicksLower = 10070;//what it was on jankbot
 
     //inches to drive forward initially just to get away from the lander
     double driveOffLift = 6;
@@ -203,12 +203,12 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
         //braking,
         testbot.enableBraking();
 
-        /*//Init Lift
+        //Init Lift
         liftMotor = hardwareMap.dcMotor.get("LIFT");
         liftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         liftMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         //Set lift:
-        liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);*/
+        liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
 
         //All done!
@@ -218,14 +218,24 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
         // Wait for the game to start (driver presses PLAY)
         waitForStart();
         runtime.reset();
-
-        /*//Lower the robot/unhook
+        telemetry.addData("Status", "Lowering");
+        telemetry.update();
+        //Lower the robot/unhook
         liftMotor.setTargetPosition(liftTicksLower);
         while(liftMotor.isBusy()) {
             liftMotor.setPower(1);
         }
-        liftMotor.setPower(0);*/
-        sleep(1000);
+        liftMotor.setPower(0);
+        rotate(-30,turnPowerNormal);
+        //lower lift
+        //lower lift
+        liftMotor.setTargetPosition(0);
+        while(liftMotor.isBusy()) {
+            liftMotor.setPower(1);
+        }
+        liftMotor.setPower(0);
+
+        rotate(30,turnPowerNormal);
 
         //Rotate back to roughly 45 deg - how it was hanging
         rotateBackToHanging();
@@ -235,12 +245,12 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
         testbot.TargetDist(Robot.LEFTMOTORS, ticksint(inchesToTicks*driveOffLift));
         encoderDrive();
 
-        /*//lower lift
-        liftMotor.setTargetPosition(-liftTicksLower);
+        //lower lift
+        liftMotor.setTargetPosition(0);
         while(liftMotor.isBusy()) {
             liftMotor.setPower(1);
         }
-        liftMotor.setPower(0);*/
+        liftMotor.setPower(0);
 
         //Align
         rotBeforeAlign = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
@@ -322,18 +332,21 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
         //rotate(-45,turnPowerNormal);
         telemetry.addData("Status: ", "DRIVE to wall, 90 next");
         telemetry.update();
-        //sleep(1000);
+        sleep(500);
 
         wallDist = frontRangeSensor.getDistance(DistanceUnit.INCH)-forwardOffset-turnDist;
+        telemetry.addData("Wall: ", wallDist);
+        telemetry.update();
         testbot.TargetDist(Robot.RIGHTMOTORS, (int)Math.round(inchesToTicks*wallDist));
         testbot.TargetDist(Robot.LEFTMOTORS, (int)Math.round(inchesToTicks*wallDist));
         encoderDrive();
+        sleep(1000);
         rotate(90,turnPowerNormal);
         telemetry.addData("Status: ", "90, backup next" );
         telemetry.update();
         //sleep(1000);
         //align();
-        LoopAlignPid(0.4,5);//normal values are 0.4 and 4
+        LoopAlignPid(0.4,4);//normal values are 0.4 and 4
         sleep(1000);
         if(goldLoc == GoldPosition.LEFT){
             testbot.TargetDist(Robot.RIGHTMOTORS, (int)Math.round(inchesToTicks*backUpinches));
@@ -389,7 +402,7 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
             telemetry.addData("X Pos" , xPos); // Gold X position.
             telemetry.update();
 
-            if (xPos < 300) testbot.TankDrive(turnPowerMin, -turnPowerMin);
+            if (xPos > 300) testbot.TankDrive(-turnPowerMin, turnPowerMin);
             else testbot.TankDrive(turnPowerMin, -turnPowerMin);
         }
         testbot.TankDrive(0,0);
@@ -479,11 +492,9 @@ public class linearAutoIntegrateV3 extends SeanLinearOpMode {
 
     @Override
     public void stop(){
-        if(imu!=null)imu.close();
-        if (isDetectorEnabled){
-            disableDetector();
-        }
-        testbot.setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        if(imu!=null) imu.close();
+        if (isDetectorEnabled) disableDetector();
+        if(testbot.FRM!=null) testbot.setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         super.stop();
     }
 
