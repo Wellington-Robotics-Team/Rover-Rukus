@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.robotcontroller.internal;
+package org.firstinspires.ftc.teamcode;
 
 import android.app.Activity;
 import android.graphics.Color;
@@ -29,7 +29,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
-
+@TeleOp(name="DeclanArmTest", group = "lol don't atme")
 public class DeclanArmTest extends OpMode {
 
     public HardwareMap hwMap;
@@ -46,7 +46,7 @@ public class DeclanArmTest extends OpMode {
     //public CRServo Roller;
 
     public double power = 0.5;
-    public double armpower = 0.05;
+    public double armpower = 0.1;
 
     public boolean RollersON = false;
 
@@ -68,10 +68,12 @@ public class DeclanArmTest extends OpMode {
         Arm1 = hwMap.dcMotor.get("Arm1");
         Arm2 = hwMap.dcMotor.get("Arm2"); // Gets Arm Motors
 
-        Arm1.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        Arm2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        Arm1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        Arm2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        Arm1.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        Arm2.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        Arm1.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        Arm2.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        //Arm1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        //Arm2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         //Bucket = hwMap.crservo.get("Bucket");
         //Roller = hwMap.crservo.get("Roller"); //Gets Servos for Bucket
@@ -83,8 +85,27 @@ public class DeclanArmTest extends OpMode {
 
     public void loop()
     {
-        Arm1.setPower(gamepad1.right_stick_x * armpower);
-        Arm2.setPower(gamepad1.right_stick_x * armpower); // Movement for the arm is controlled by the horizontal motion of the right thumbstick at the main power level
+        /*
+        if(gamepad1.a){
+            Arm1.setPower(0);
+            Arm2.setPower(0);
+        }
+        if(gamepad1.b){
+            Arm1.setTargetPosition(0);
+            Arm2.setTargetPosition(0);
+        }
+        */
+        //Arm1.setPower(gamepad1.right_stick_x * armpower);
+        //Arm2.setPower(gamepad1.right_stick_x * armpower); // Movement for the arm is controlled by the horizontal motion of the right thumbstick at the main power level
+        if (gamepad1.right_stick_x == 0){
+            ArmMove(Arm1.getCurrentPosition(),armpower);
+        }
+        if(gamepad1.right_stick_x>0){
+            ArmMove(110, gamepad1.right_stick_x*armpower);
+        }
+        if(gamepad1.right_stick_x<0){
+            ArmMove(0, gamepad1.right_stick_x*armpower);
+        }
 
 
         if (gamepad1.right_trigger == 1) {
@@ -133,6 +154,9 @@ public class DeclanArmTest extends OpMode {
         telemetry.addData("Arm Power: ", armpower);
         telemetry.addData("Arm1: ", Arm1.getPower());
         telemetry.addData("Arm2: ", Arm2.getPower());
+        telemetry.addData("Arm1: ", Arm1.getCurrentPosition());
+        telemetry.addData("Arm2: ", Arm2.getCurrentPosition());
+
         telemetry.addData("BLM: ", BLM.getPower());
         telemetry.addData("BRM: ", BRM.getPower());
         telemetry.addData("FRM: ", FRM.getPower());
@@ -156,6 +180,12 @@ public class DeclanArmTest extends OpMode {
          * Right Trig - Arm Power Up
          * Left Trig - Arm Power Down
          **/
+    }
+    public void ArmMove(int position, double pow){
+        Arm1.setTargetPosition(-position);
+        Arm2.setTargetPosition(position);
+        Arm1.setPower(pow);
+        Arm2.setPower(pow);
     }
 
     public void move(double leftPower, double rightPower) //move function for ez use
